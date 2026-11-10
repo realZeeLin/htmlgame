@@ -11,17 +11,19 @@ export function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.im
 const rr = (a, b) => a + (b - a) * rnd();
 
 // ---------------------------------------------------------------- 纹理
+// 纹理按 K 倍超采样绘制（桌面 4×，触屏 2×），保证近看清晰
+const K = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 2 : 4;
 function ctex(w, h, draw, repeat = true) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const g = c.getContext('2d'); draw(g, w, h);
+  const k = repeat ? K : Math.min(K, 2), c = document.createElement('canvas'); c.width = w * k; c.height = h * k;
+  const g = c.getContext('2d'); g.scale(k, k); draw(g, w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 8; return t;
+  t.anisotropy = 16; return t;
 }
 function speckle(g, w, h, n, alpha, size = 2) {
-  for (let i = 0; i < n; i++) {
+  for (let i = 0, m = n * K * 2; i < m; i++) {
     g.fillStyle = `rgba(${rnd() < .5 ? '0,0,0' : '255,255,255'},${(alpha * rnd()).toFixed(3)})`;
-    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * size, 1 + rnd() * size);
+    g.fillRect(rnd() * w, rnd() * h, (.5 + rnd() * size) / K * 1.6, (.5 + rnd() * size) / K * 1.6);
   }
 }
 function bricks(g, w, h, rows, cols, hue, sat, lig, mortar, jit = 6) {
@@ -40,7 +42,7 @@ function glass(g, x, y, w, h, a = '#1c2c3c', b = '#587a96') {
 
 const T = {};
 function makeTextures() {
-  T.grass = ctex(256, 256, (g, w, h) => { g.fillStyle = '#58803a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 5000; i++) { g.fillStyle = `hsl(${rr(80, 110)},${rr(30, 50)}%,${rr(22, 40)}%)`; g.fillRect(rnd() * w, rnd() * h, 1.5, rr(2, 5)); } });
+  T.grass = ctex(256, 256, (g, w, h) => { g.fillStyle = '#58803a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 9000 * K; i++) { g.fillStyle = `hsl(${rr(75, 112)},${rr(30, 55)}%,${rr(20, 42)}%)`; g.fillRect(rnd() * w, rnd() * h, .5, rr(1, 3.5)); } });
   T.asphalt = ctex(256, 256, (g, w, h) => { g.fillStyle = '#54565a'; g.fillRect(0, 0, w, h); speckle(g, w, h, 7000, .16); });
   T.paver = ctex(256, 256, (g, w, h) => { // 广场地砖 (2m)
     g.fillStyle = '#8f8683'; g.fillRect(0, 0, w, h);
@@ -62,11 +64,11 @@ function makeTextures() {
   });
   T.libTile = ctex(256, 256, (g, w, h) => { // 图书馆粉色小面砖
     g.fillStyle = '#957468'; g.fillRect(0, 0, w, h);
-    for (let r = 0; r < 32; r++) for (let c = 0; c < 16; c++) { g.fillStyle = `hsl(${rr(8, 18)},${rr(24, 36)}%,${rr(58, 72)}%)`; g.fillRect(c * 16 + .5, r * 8 + .5, 15, 7); }
+    for (let r = 0; r < 32; r++) for (let c = 0; c < 16; c++) { g.fillStyle = `hsl(${rr(11, 15)},${rr(26, 32)}%,${rr(63, 68)}%)`; g.fillRect(c * 16 + .5, r * 8 + .5, 15, 7); }
   });
   T.libWin = ctex(256, 256, (g, w, h) => { // 图书馆底部楼层 4m×3m
     g.fillStyle = '#c3a498'; g.fillRect(0, 0, w, h);
-    for (let r = 0; r < 32; r++) for (let c = 0; c < 16; c++) { g.fillStyle = `hsl(${rr(10, 18)},${rr(20, 30)}%,${rr(62, 72)}%)`; g.fillRect(c * 16 + .5, r * 8 + .5, 15, 7); }
+    for (let r = 0; r < 32; r++) for (let c = 0; c < 16; c++) { g.fillStyle = `hsl(${rr(11, 15)},${rr(24, 30)}%,${rr(63, 68)}%)`; g.fillRect(c * 16 + .5, r * 8 + .5, 15, 7); }
     glass(g, 8, 40, 240, 130, '#141c24', '#3b5266');
     g.fillStyle = '#6d6058'; for (let i = 0; i <= 3; i++) g.fillRect(8 + i * 78, 40, 5, 130);
     g.fillStyle = '#a58a80'; g.fillRect(0, 176, w, 12);
@@ -133,6 +135,14 @@ function makeTextures() {
   T.bark = ctex(64, 128, (g, w, h) => { g.fillStyle = '#b9b39f'; g.fillRect(0, 0, w, h); for (let i = 0; i < 60; i++) { g.fillStyle = `hsl(${rr(40, 80)},${rr(10, 25)}%,${rr(40, 75)}%)`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, rr(3, 9), rr(5, 14), rnd(), 0, 7); g.fill(); } });
 }
 
+/** 由颜色贴图的明暗推导法线贴图，让砖缝、地砖、混凝土在阳光下有凹凸感 */
+function normalFrom(tex, strength = 2) {
+  const src = tex.image, w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const H = new Float32Array(w * h); for (let i = 0; i < w * h; i++) H[i] = (d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11) / 255;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), out = g.createImageData(w, h), o = out.data;
+  for (let y = 0; y < h; y++) { const y0 = ((y - 1 + h) % h) * w, y1 = ((y + 1) % h) * w; for (let x = 0; x < w; x++) { const x0 = (x - 1 + w) % w, x1 = (x + 1) % w, dx = (H[y * w + x0] - H[y * w + x1]) * strength, dy = (H[y1 + x] - H[y0 + x]) * strength, l = 1 / Math.sqrt(dx * dx + dy * dy + 1), i = (y * w + x) * 4; o[i] = (dx * l * .5 + .5) * 255; o[i + 1] = (dy * l * .5 + .5) * 255; o[i + 2] = (l * .5 + .5) * 255; o[i + 3] = 255; } }
+  g.putImageData(out, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; return t;
+}
 const std = (o) => new THREE.MeshStandardMaterial(Object.assign({ roughness: .85, metalness: 0 }, o));
 export const M = {};
 function makeMaterials() {
@@ -155,6 +165,7 @@ function makeMaterials() {
   M.vase = std({ color: 0x5b2a6e, roughness: .15, metalness: .3 });
   M.fence = std({ map: T.fence, transparent: true, alphaTest: .4, side: THREE.DoubleSide, metalness: .6, roughness: .4 });
   M.bark = std({ map: T.bark, roughness: 1 }); M.barkDark = std({ color: 0x4a3a30, roughness: 1 });
+  for (const [k, st] of [['brick', 3], ['brickWin', 3], ['walk', 2.5], ['paver', 2], ['libTile', 2.5], ['libWin', 2], ['granite', 1.5], ['stone', 1.2], ['orange', 2.5], ['orangeWin', 2.5], ['concrete', 2], ['histWin', 2], ['asphalt', 1.6], ['panel', 1.5], ['grass', 1.2]]) M[k].normalMap = normalFrom(M[k].map, st);
   M.lamp = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d0, emissiveIntensity: .5, roughness: .3 });
 }
 

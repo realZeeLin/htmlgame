@@ -1,5 +1,10 @@
 // game.js — 大蜀山小龙虾 · 校园行动（第一人称射击）
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { buildWorld, colliders, mapShapes, addCollider, WORLD, FONT, rnd } from './world.js';
 
 const $ = (s) => document.querySelector(s);
@@ -13,7 +18,9 @@ const nextFrame = () => new Promise(r => setTimeout(r, 30));
 // ================================================================ 渲染器与场景
 const canvas = $('#view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+const settings = { vol: .7, sens: 1, q: 'high' };
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const pxRatio = () => settings.q === 'low' ? Math.min(window.devicePixelRatio || 1, 1.25) : Math.min(window.devicePixelRatio || 1, COARSE ? 1.75 : 2);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .78;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -46,15 +53,31 @@ sky.frustumCulled = false;
 scene.add(sky);
 const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x6b6a4a, .7); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0d8, 3.4);
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0004; sun.shadow.normalBias = .06;
+sun.castShadow = true; sun.shadow.mapSize.setScalar(COARSE ? 2048 : 4096); sun.shadow.bias = -.0004; sun.shadow.normalBias = .06;
 Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 320 }); sun.shadow.camera.updateProjectionMatrix();
 scene.add(sun, sun.target);
-function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-window.addEventListener('resize', resize); resize();
+// 后期处理：MSAA + 泛光 + 色调映射 + 锐化 / 暗角 / 胶片颗粒
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(4, 4), .3, .55, 1.0));
+composer.addPass(new OutputPass());
+const finish = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, px: { value: new THREE.Vector2() }, time: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 px; uniform float time; varying vec2 vUv;
+    void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb;
+      vec3 n = texture2D(tDiffuse, vUv + vec2(px.x, 0.)).rgb + texture2D(tDiffuse, vUv - vec2(px.x, 0.)).rgb + texture2D(tDiffuse, vUv + vec2(0., px.y)).rgb + texture2D(tDiffuse, vUv - vec2(0., px.y)).rgb;
+      c = clamp(c + (c - n * .25) * .6, 0., 1.);
+      c *= mix(.8, 1., smoothstep(.9, .35, length(vUv - .5)));
+      c += (fract(sin(dot(vUv + fract(time), vec2(12.9898, 78.233))) * 43758.5453) - .5) * .014;
+      gl_FragColor = vec4(c, 1.); }` });
+composer.addPass(finish);
+function resize() { const w = window.innerWidth, h = window.innerHeight, r = pxRatio(); renderer.setPixelRatio(r); renderer.setSize(w, h, false); composer.setPixelRatio(r); composer.setSize(w, h); finish.uniforms.px.value.set(1 / (w * r), 1 / (h * r)); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize);
 
 // ================================================================ 音频（合成）
+resize();
 let AC = null, master = null, noiseBuf = null;
-const settings = { vol: .7, sens: 1 };
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
@@ -226,8 +249,8 @@ function buildRelays() {
 const EM = {};
 function enemyAssets() {
   EM.hull = new THREE.MeshStandardMaterial({ color: 0x30353b, roughness: .35, metalness: .8 }); EM.warn = new THREE.MeshStandardMaterial({ color: 0xd9741e, roughness: .5, metalness: .3 });
-  EM.eye = new THREE.MeshBasicMaterial({ color: 0xff2a1a, fog: false }); EM.rotor = new THREE.MeshBasicMaterial({ color: 0x9aa4ae, transparent: true, opacity: .35, depthWrite: false });
-  EM.bolt = new THREE.MeshBasicMaterial({ color: 0xff5a30, fog: false });
+  EM.eye = new THREE.MeshBasicMaterial({ fog: false }); EM.eye.color.setRGB(5, .35, .2); EM.rotor = new THREE.MeshBasicMaterial({ color: 0x9aa4ae, transparent: true, opacity: .35, depthWrite: false });
+  EM.bolt = new THREE.MeshBasicMaterial({ fog: false }); EM.bolt.color.setRGB(6, 1.2, .5);
   EM.gBody = new THREE.SphereGeometry(.42, 16, 10); EM.gEye = new THREE.SphereGeometry(.12, 10, 8); EM.gArm = new THREE.BoxGeometry(1.5, .05, .08); EM.gRotor = new THREE.CylinderGeometry(.34, .34, .02, 16); EM.gBarrel = new THREE.CylinderGeometry(.04, .04, .4, 8);
   EM.gTorso = new THREE.BoxGeometry(.46, .42, 1.1); EM.gHead = new THREE.BoxGeometry(.3, .28, .42); EM.gLeg = new THREE.BoxGeometry(.11, .62, .13); EM.gVisor = new THREE.BoxGeometry(.24, .07, .03); EM.gBolt = new THREE.SphereGeometry(.13, 8, 6);
 }
@@ -537,10 +560,12 @@ if (isTouch) {
 // 菜单按钮
 for (const b of document.querySelectorAll('[data-act]')) b.addEventListener('click', () => { audioInit(); const a = b.dataset.act; if (a === 'start' || a === 'retry') startGame(); else if (a === 'resume') resume(); else if (a === 'title') { G.state = 'title'; G.retries = 0; show('title'); } else if (a === 'fs') { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(() => { }); } });
 $('#set-vol').addEventListener('input', (e) => { settings.vol = +e.target.value; if (master) master.gain.value = settings.vol; });
+$('#set-q').addEventListener('change', (e) => setQuality(e.target.value));
 $('#set-sens').addEventListener('input', (e) => { settings.sens = +e.target.value; });
 
 // ================================================================ 主循环
-let last = performance.now();
+let last = performance.now(), slowT = 0;
+function setQuality(q) { settings.q = q; slowT = 0; $('#set-q').value = q; sun.shadow.mapSize.setScalar(q === "high" && !COARSE ? 4096 : 2048); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } resize(); }
 function tick(dt) { // 一步游戏模拟
   G.time += dt; updatePlayer(dt); if (G.state !== 'play') return;
   if (G.t - lastFlow > .35) { lastFlow = G.t; flow(P.pos.x, P.pos.z); }
@@ -560,7 +585,10 @@ function frame(now) {
   if (G.state !== 'pause') { stepPoints(sparks, dt, 12, .8); stepPoints(smoke, dt, -1.2, 1.2); stepPoints(dust, dt, 2, 2); stepPetals(dt, G.t); flashLight.intensity *= Math.exp(-dt * 40); boomLight.intensity *= Math.exp(-dt * 7); if (flashMesh.visible && P.cool < .06) flashMesh.visible = false; }
   // 阴影跟随
   const cx = Math.round(camera.position.x / 4) * 4, cz = Math.round(camera.position.z / 4) * 4; sun.target.position.set(cx, 0, cz); sun.position.set(cx, 0, cz).addScaledVector(sunDir, 160); sun.target.updateMatrixWorld();
-  sky.position.copy(camera.position); renderer.render(scene, camera);
+  sky.position.copy(camera.position);
+  if (settings.q === 'high') { finish.uniforms.time.value = G.t; composer.render(dt); } else renderer.render(scene, camera);
+  // 帧率过低时自动降低画质
+  if (settings.q === 'high' && G.state === 'play' && !window.__noAutoQ) { slowT = dt > .045 ? slowT + dt : Math.max(0, slowT - dt * 2); if (slowT > 4) { setQuality('low'); msg('帧率偏低，已自动切换为流畅画质'); } }
 }
 
 (async function main() {
@@ -569,7 +597,7 @@ function frame(now) {
     buildWorld(scene); boot(55, '正在栽种梧桐与樱花'); await nextFrame();
     enemyAssets(); buildRelays(); buildNav(); boot(75, '正在部署信号中继'); await nextFrame();
     buildMap(); buildMarks(); resetGame(); boot(90, '正在准备首帧画面'); await nextFrame();
-    renderer.compile(scene, camera); G.state = 'title'; show('title'); requestAnimationFrame(frame);
+    renderer.compile(scene, camera); composer.render(0); G.state = 'title'; show('title'); requestAnimationFrame(frame);
     boot(100); setTimeout(() => $('#boot').classList.add('done'), 350);
     window.__game = { G, P, enemies, relays, startGame, cutRelay, endGame, renderer, sun, navH, navD, navE, cellOf, keys, input, pickups, sim(sec) { for (let i = 0, n = Math.round(sec * 60); i < n && G.state === 'play'; i++) { G.t += 1 / 60; tick(1 / 60); } } };
   } catch (err) { console.error(err); $('#boot-msg').textContent = '启动失败：' + (err && err.message || err); }

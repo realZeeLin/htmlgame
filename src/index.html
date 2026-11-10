@@ -38,7 +38,7 @@ body.touch .keys { display:none; }
 .card h2 { font-family:var(--kai); font-size:44px; margin:0 0 6px; letter-spacing:.1em; } .card p { color:var(--dim); line-height:1.7; margin:6px 0 22px; font-size:14px; }
 #win .card { border-top-color:var(--ok); } #rank { color:var(--ok); }
 #stats { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0 24px; } #stats div { font-size:12px; color:var(--dim); letter-spacing:.15em; } #stats b { display:block; font-size:30px; color:var(--bone); letter-spacing:0; }
-.row { display:flex; align-items:center; gap:14px; margin:0 0 14px; font-size:13px; color:var(--dim); } .row input { flex:1; accent-color:var(--red); }
+.row { display:flex; align-items:center; gap:14px; margin:0 0 14px; font-size:13px; color:var(--dim); } .row input { flex:1; accent-color:var(--red); } .row select { flex:1; font:inherit; color:var(--bone); background:#1a1e22; border:1px solid var(--line); padding:6px 8px; }
 /* HUD */
 #hud { position:fixed; inset:0; z-index:10; pointer-events:none; display:none; text-shadow:var(--sh); } #hud.on { display:block; }
 #cross { position:absolute; left:50%; top:50%; width:26px; height:26px; margin:-13px; }
@@ -114,6 +114,7 @@ body.touch #radio { bottom:auto; top:calc(var(--st) + 56px); width:min(420px,46v
   <h2>已暂停</h2><p>行动暂时中止。继续游戏后将重新捕获鼠标。</p>
   <label class="row">主音量<input id="set-vol" type="range" min="0" max="1" step="0.05" value="0.7"></label>
   <label class="row">视角灵敏度<input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="1"></label>
+  <label class="row">画面质量<select id="set-q"><option value="high">高清（泛光 · 抗锯齿 · 锐化）</option><option value="low">流畅</option></select></label>
   <div class="btns"><button class="pri" data-act="resume">继续游戏</button><button data-act="retry">重新开始</button><button data-act="title">返回标题</button></div>
 </div></div>
 <div class="screen card-wrap" id="dead"><div class="card">
