@@ -1,0 +1,25 @@
+{
+  "name": "campus-fps",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/realZeeLin/htmlgame.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/realZeeLin/htmlgame/issues"
+  },
+  "homepage": "https://github.com/realZeeLin/htmlgame#readme",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.170.0"
+  },
+  "private": true,
+  "type": "module"
+}

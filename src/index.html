@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>大蜀山小龙虾 · 校园行动</title>
+<style>
+:root { color-scheme: dark; --ink:#0c0f12; --bone:#f0ebe0; --dim:rgba(240,235,224,.66); --line:rgba(240,235,224,.22); --sig:#ffb347; --red:#c8203a; --alarm:#ff5a40; --ok:#50ff90; --plate:rgba(12,15,18,.58);
+  --f:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC",system-ui,sans-serif; --kai:STXingkai,"Xingkai SC","华文行楷",KaiTi,STKaiti,"楷体",var(--f);
+  --sl:max(16px,env(safe-area-inset-left,0px)); --sr:max(16px,env(safe-area-inset-right,0px)); --st:max(12px,env(safe-area-inset-top,0px)); --sb:max(12px,env(safe-area-inset-bottom,0px)); --sh:0 0 2px rgba(0,0,0,.8),0 1px 6px rgba(0,0,0,.6); }
+* { box-sizing:border-box; }
+html,body { height:100%; margin:0; background:var(--ink); color:var(--bone); font-family:var(--f); overflow:hidden; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; overscroll-behavior:none; }
+#view { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; outline:none; }
+body.playing #view { cursor:crosshair; }
+/* 开场 */
+#boot { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:radial-gradient(ellipse at 50% 40%,#1b2026,#0c0f12 70%); transition:opacity .7s; padding:0 var(--sl); }
+#boot.done { opacity:0; pointer-events:none; }
+.boot-mark { font-family:var(--kai); font-weight:900; font-size:clamp(40px,10vw,104px); letter-spacing:.12em; margin-right:-.12em; line-height:1.1; text-align:center; color:var(--bone); text-shadow:0 0 40px rgba(200,32,58,.5); }
+.boot-sub { font-size:13px; letter-spacing:.3em; color:var(--dim); text-align:center; }
+.boot-bar { width:min(340px,70vw); height:2px; background:#2a3036; } .boot-bar i { display:block; height:100%; width:0; background:var(--red); transition:width .25s; }
+/* 菜单 */
+.screen { position:fixed; inset:0; z-index:20; display:none; padding:var(--st) var(--sr) var(--sb) var(--sl); }
+.screen.on { display:flex; }
+#title { flex-direction:column; justify-content:flex-end; background:linear-gradient(90deg,rgba(8,10,12,.82) 0%,rgba(8,10,12,.45) 38%,transparent 66%),linear-gradient(0deg,rgba(8,10,12,.6),transparent 40%); padding-left:max(6vw,var(--sl)); padding-bottom:max(7vh,var(--sb)); }
+.kicker { font-size:12px; letter-spacing:.36em; color:var(--sig); margin-bottom:10px; text-shadow:var(--sh); }
+h1 { font-family:var(--kai); font-size:clamp(44px,9vw,120px); line-height:1.05; margin:0; letter-spacing:.06em; text-shadow:0 2px 24px rgba(0,0,0,.7); }
+h1 small { display:block; font-family:var(--f); font-weight:300; font-size:.24em; letter-spacing:.5em; color:var(--dim); margin-top:.5em; }
+.brief { max-width:520px; margin:18px 0 24px; font-size:15px; line-height:1.8; color:var(--dim); text-shadow:var(--sh); }
+.btns { display:flex; gap:12px; flex-wrap:wrap; }
+button { font:inherit; color:var(--bone); background:var(--plate); border:1px solid var(--line); padding:13px 28px; letter-spacing:.2em; font-size:15px; cursor:pointer; backdrop-filter:blur(6px); transition:.15s; }
+button:hover { border-color:var(--bone); background:rgba(240,235,224,.12); }
+button.pri { background:var(--red); border-color:var(--red); font-weight:700; } button.pri:hover { background:#e02a46; }
+.keys { margin-top:22px; display:grid; grid-template-columns:repeat(4,auto); gap:6px 22px; width:max-content; max-width:100%; font-size:12px; color:var(--dim); text-shadow:var(--sh); }
+.keys b { color:var(--bone); font-weight:600; margin-right:6px; }
+body.touch .keys { display:none; }
+.card-wrap { align-items:center; justify-content:center; background:rgba(8,10,12,.72); backdrop-filter:blur(5px); }
+.card { width:min(480px,100%); padding:34px 34px 30px; background:rgba(14,17,20,.92); border:1px solid var(--line); border-top:3px solid var(--red); }
+.card h2 { font-family:var(--kai); font-size:44px; margin:0 0 6px; letter-spacing:.1em; } .card p { color:var(--dim); line-height:1.7; margin:6px 0 22px; font-size:14px; }
+#win .card { border-top-color:var(--ok); } #rank { color:var(--ok); }
+#stats { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0 24px; } #stats div { font-size:12px; color:var(--dim); letter-spacing:.15em; } #stats b { display:block; font-size:30px; color:var(--bone); letter-spacing:0; }
+.row { display:flex; align-items:center; gap:14px; margin:0 0 14px; font-size:13px; color:var(--dim); } .row input { flex:1; accent-color:var(--red); }
+/* HUD */
+#hud { position:fixed; inset:0; z-index:10; pointer-events:none; display:none; text-shadow:var(--sh); } #hud.on { display:block; }
+#cross { position:absolute; left:50%; top:50%; width:26px; height:26px; margin:-13px; }
+#cross::before,#cross::after { content:""; position:absolute; background:var(--bone); box-shadow:0 0 2px #000; opacity:.9; }
+#cross::before { left:12px; top:0; width:2px; height:26px; -webkit-mask:linear-gradient(#000 0 8px,transparent 8px 18px,#000 18px); mask:linear-gradient(#000 0 8px,transparent 8px 18px,#000 18px); }
+#cross::after { top:12px; left:0; height:2px; width:26px; -webkit-mask:linear-gradient(90deg,#000 0 8px,transparent 8px 18px,#000 18px); mask:linear-gradient(90deg,#000 0 8px,transparent 8px 18px,#000 18px); }
+#hitm { position:absolute; left:50%; top:50%; width:30px; height:30px; margin:-15px; opacity:0; background:linear-gradient(45deg,transparent 46%,#fff 46% 54%,transparent 54%),linear-gradient(-45deg,transparent 46%,#fff 46% 54%,transparent 54%); -webkit-mask:radial-gradient(circle,transparent 6px,#000 7px); mask:radial-gradient(circle,transparent 6px,#000 7px); }
+#hitm.on { animation:hit .22s ease-out; } #hitm.weak { filter:drop-shadow(0 0 3px var(--alarm)) sepia(1) saturate(8) hue-rotate(-30deg); }
+@keyframes hit { 0% { opacity:1; transform:scale(.7); } 100% { opacity:0; transform:scale(1.25); } }
+#vig { position:absolute; inset:0; opacity:0; background:radial-gradient(ellipse,transparent 45%,rgba(190,20,10,.55)); transition:opacity .3s; }
+#dmg { position:absolute; left:50%; top:50%; width:240px; height:240px; margin:-120px; opacity:0; } #dmg::before { content:""; position:absolute; left:80px; top:0; width:80px; height:10px; border-radius:50%/100% 100% 0 0; background:var(--alarm); box-shadow:0 0 14px var(--alarm); }
+#dmg.on { animation:fade 1s ease-out; } @keyframes fade { 0% { opacity:1; } 100% { opacity:0; } }
+#obj { position:absolute; left:var(--sl); top:var(--st); max-width:min(320px,60vw); border-left:3px solid var(--sig); padding:4px 0 4px 12px; }
+#obj small { font-size:11px; letter-spacing:.3em; color:var(--sig); } #obj-text { font-size:16px; font-weight:600; margin:3px 0 6px; }
+#obj-pips i { display:block; font-style:normal; font-size:12.5px; color:var(--dim); line-height:1.7; } #obj-pips i::before { content:"◇ "; color:var(--sig); }
+#obj-pips i.done { text-decoration:line-through; opacity:.55; } #obj-pips i.done::before { content:"◆ "; color:var(--ok); } #obj-pips i.go { color:var(--ok); } #obj-pips i.go::before { color:var(--ok); }
+#mapbox { position:absolute; right:var(--sr); top:var(--st); text-align:center; } #minimap { width:150px; height:150px; border-radius:50%; border:2px solid var(--line); background:rgba(12,15,18,.5); display:block; }
+#clock { font-size:12px; letter-spacing:.2em; color:var(--dim); margin-top:5px; font-variant-numeric:tabular-nums; }
+#warn { position:absolute; left:50%; top:16%; transform:translateX(-50%); padding:8px 22px; font-size:15px; letter-spacing:.3em; color:#fff; background:rgba(200,32,58,.8); opacity:0; transition:opacity .3s; white-space:nowrap; } #warn.on { opacity:1; animation:blink .5s 4; } @keyframes blink { 50% { opacity:.35; } }
+#msg { position:absolute; left:50%; top:62%; transform:translateX(-50%); font-size:15px; letter-spacing:.15em; opacity:0; transition:opacity .25s; } #msg.on { opacity:1; }
+#feed { position:absolute; right:var(--sr); top:calc(var(--st) + 190px); text-align:right; font-size:12.5px; color:var(--dim); line-height:1.8; }
+#prompt { position:absolute; left:50%; top:56%; transform:translateX(-50%); display:none; text-align:center; font-size:14px; letter-spacing:.12em; background:var(--plate); border:1px solid var(--line); padding:9px 18px 12px; } #prompt.on { display:block; }
+#prompt kbd { font:inherit; font-weight:700; color:var(--ink); background:var(--sig); padding:1px 8px; margin:0 5px; border-radius:2px; text-shadow:none; }
+#prompt .bar { height:3px; background:rgba(255,255,255,.15); margin-top:9px; } #prompt-fill { display:block; height:100%; width:0; background:var(--sig); }
+body.touch #prompt kbd { display:none; }
+#hp { position:absolute; left:var(--sl); bottom:var(--sb); width:210px; } #hp small { font-size:11px; letter-spacing:.3em; color:var(--dim); } #hp-n { float:right; font-size:20px; font-weight:700; line-height:1; }
+#hp .bar { height:6px; background:rgba(255,255,255,.16); margin-top:6px; transform:skewX(-18deg); } #hp-fill { display:block; height:100%; background:var(--bone); transition:width .2s; } #hp.low #hp-fill { background:var(--alarm); } #hp.low #hp-n { color:var(--alarm); }
+#ammo { position:absolute; right:var(--sr); bottom:var(--sb); text-align:right; } #ammo-n { font-size:52px; font-weight:800; line-height:.9; font-variant-numeric:tabular-nums; } #ammo-r { font-size:20px; color:var(--dim); margin-left:6px; } #ammo-r::before { content:"/ "; }
+#ammo.low #ammo-n { color:var(--alarm); } #ammo-s { font-size:11px; letter-spacing:.3em; color:var(--dim); margin-top:6px; }
+#radio { position:absolute; left:50%; bottom:var(--sb); transform:translateX(-50%); width:min(560px,calc(100vw - 520px)); opacity:0; transition:opacity .4s; background:var(--plate); border-left:3px solid var(--sig); padding:9px 14px; } #radio.on { opacity:1; }
+#radio small { font-size:11px; letter-spacing:.3em; color:var(--sig); } #radio p { margin:3px 0 0; font-size:14.5px; line-height:1.6; }
+.mark { position:absolute; left:0; top:0; width:0; height:0; } .mark b { position:absolute; left:-7px; top:-7px; width:14px; height:14px; border:2px solid var(--sig); transform:rotate(45deg); background:rgba(255,179,71,.25); } .mark span { position:absolute; top:13px; left:-60px; width:120px; text-align:center; font-size:11.5px; color:var(--sig); white-space:nowrap; }
+.mark.go b { border-color:var(--ok); background:rgba(80,255,144,.25); } .mark.go span { color:var(--ok); }
+/* 触屏 */
+.tb,#stick { display:none; } body.touch.playing .tb { display:flex; }
+.tb { position:fixed; z-index:12; width:60px; height:60px; border-radius:50%; align-items:center; justify-content:center; font-size:13px; letter-spacing:0; padding:0; background:rgba(12,15,18,.42); border:1.5px solid rgba(240,235,224,.4); touch-action:none; }
+.tb.on { background:rgba(240,235,224,.3); }
+#t-fire { right:calc(var(--sr) + 14px); bottom:calc(var(--sb) + 84px); width:84px; height:84px; border-color:var(--alarm); font-size:15px; }
+#t-ads { right:calc(var(--sr) + 112px); bottom:calc(var(--sb) + 64px); } #t-jump { right:calc(var(--sr) + 6px); bottom:calc(var(--sb) + 182px); } #t-reload { right:calc(var(--sr) + 86px); bottom:calc(var(--sb) + 160px); }
+#t-use { right:calc(var(--sr) + 180px); bottom:calc(var(--sb) + 110px); border-color:var(--sig); } #t-pause { left:50%; margin-left:-22px; top:var(--st); width:44px; height:44px; }
+#stick { position:fixed; z-index:11; width:110px; height:110px; margin:-55px; border-radius:50%; border:1.5px solid rgba(240,235,224,.35); background:rgba(12,15,18,.25); pointer-events:none; } #stick i { position:absolute; left:33px; top:33px; width:44px; height:44px; border-radius:50%; background:rgba(240,235,224,.5); }
+body.touch #ammo { bottom:calc(var(--sb) + 250px); } body.touch #ammo-n { font-size:34px; } @media (max-width:900px) { #radio { bottom:calc(var(--sb) + 70px); width:84vw; } }
+body.touch #radio { bottom:auto; top:calc(var(--st) + 56px); width:min(420px,46vw); } body.touch #feed { display:none; }
+@media (max-width:700px) { #minimap { width:104px; height:104px; } .card { padding:24px 20px; } .keys { grid-template-columns:repeat(2,auto); } #obj-text { font-size:14px; } }
+@media (max-height:480px) { .brief { display:none; } h1 { font-size:clamp(36px,13vh,72px); } .kicker { margin-bottom:4px; } #title .btns { margin-top:14px; } #minimap { width:96px; height:96px; } }
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0"></canvas>
+
+<div id="hud">
+  <div id="vig"></div><div id="dmg"></div><div id="marks"></div>
+  <div id="cross"></div><div id="hitm"></div>
+  <div id="obj"><small>任务目标</small><div id="obj-text"></div><div id="obj-pips"></div></div>
+  <div id="mapbox"><canvas id="minimap" width="300" height="300"></canvas><div id="clock">0:00</div></div>
+  <div id="feed"></div><div id="warn"></div><div id="msg"></div>
+  <div id="prompt">按住<kbd>E</kbd>关闭信号中继<div class="bar"><i id="prompt-fill"></i></div></div>
+  <div id="radio"><small>大蜀山指挥部</small><p></p></div>
+  <div id="hp"><small>生命状态</small><span id="hp-n">100</span><div class="bar"><i id="hp-fill"></i></div></div>
+  <div id="ammo"><span id="ammo-n">30</span><span id="ammo-r">150</span><div id="ammo-s"></div></div>
+</div>
+<div id="stick"><i></i></div>
+<button class="tb" id="t-fire">开火</button><button class="tb" id="t-ads">瞄准</button><button class="tb" id="t-jump">跳跃</button><button class="tb" id="t-reload">换弹</button><button class="tb" id="t-use">交互</button><button class="tb" id="t-pause">Ⅱ</button>
+
+<div class="screen" id="title">
+  <div class="kicker">第一人称射击 · 校园地图</div>
+  <h1>大蜀山小龙虾<small>校园行动</small></h1>
+  <p class="brief">樱花季的清晨，校园安保系统失控，机械无人机与巡逻犬封锁了校园。从南门潜入，关闭图书馆、少年班学院、校史馆的三处信号中继，然后原路撤离。</p>
+  <div class="btns"><button class="pri" data-act="start">开始行动</button><button data-act="fs">全屏</button></div>
+  <div class="keys"><span><b>WASD</b>移动</span><span><b>鼠标</b>视角</span><span><b>左键</b>开火</span><span><b>右键</b>瞄准</span><span><b>Shift</b>冲刺</span><span><b>空格</b>跳跃</span><span><b>C</b>蹲伏</span><span><b>R</b>换弹</span><span><b>E</b>交互</span><span><b>P / Esc</b>暂停</span></div>
+</div>
+<div class="screen card-wrap" id="pause"><div class="card">
+  <h2>已暂停</h2><p>行动暂时中止。继续游戏后将重新捕获鼠标。</p>
+  <label class="row">主音量<input id="set-vol" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+  <label class="row">视角灵敏度<input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="1"></label>
+  <div class="btns"><button class="pri" data-act="resume">继续游戏</button><button data-act="retry">重新开始</button><button data-act="title">返回标题</button></div>
+</div></div>
+<div class="screen card-wrap" id="dead"><div class="card">
+  <h2>小龙虾倒下了</h2><p id="dead-info"></p>
+  <div class="btns"><button class="pri" data-act="retry">再次出击</button><button data-act="title">返回标题</button></div>
+</div></div>
+<div class="screen card-wrap" id="win"><div class="card">
+  <h2>校园已解除封锁</h2><p>行动评级 · <b id="rank"></b></p><div id="stats"></div>
+  <div class="btns"><button class="pri" data-act="retry">再来一次</button><button data-act="title">返回标题</button></div>
+</div></div>
+
+<div id="boot">
+  <div class="boot-mark">大蜀山小龙虾</div>
+  <div class="boot-sub" id="boot-msg">正在载入校园</div>
+  <div class="boot-bar"><i id="boot-fill"></i></div>
+</div>
+<script>/*__JS__*/</script>
+</body>
+</html>
